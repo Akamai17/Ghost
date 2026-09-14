@@ -9,6 +9,12 @@ Two tiers:
 
 No voice, no vision yet.
 
+## Download
+
+**[⬇ Ghost-0.1.0.dmg](https://github.com/Akamai17/Ghost/releases/latest/download/Ghost-0.1.0.dmg)** — macOS 14+, Apple Silicon and Intel.
+
+Not notarized yet, so macOS blocks it the first time: click Done, then **System Settings → Privacy & Security → Open Anyway**. (Private repo — you need to be signed in to GitHub with access.)
+
 ## Build
 
 ```
