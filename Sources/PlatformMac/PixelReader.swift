@@ -37,9 +37,9 @@ public enum PixelReader {
     /// True when the tree has essentially nothing inside the window: the signature of a web view that hides its controls.
     public static func isSparse(_ snap: Snapshot) -> Bool {
         let chrome: Set<String> = ["AXCloseButton", "AXMinimizeButton", "AXZoomButton", "AXFullScreenButton"]
-        let inside = snap.elements.filter {
-            $0.isInteractive && $0.role != "AXMenuBarItem" && $0.role != "AXMenuItem" && !chrome.contains($0.subrole ?? "")
-        }
+        let menus: Set<String> = ["AXMenuBarItem", "AXMenuItem", "AXMenuBar", "AXMenu"]
+        // Anything labeled counts: a Finder icon view is all images and groups, and that's a fine tree.
+        let inside = snap.elements.filter { !menus.contains($0.role) && !chrome.contains($0.subrole ?? "") }
         return inside.count < 5
     }
 
@@ -52,7 +52,7 @@ public enum PixelReader {
             let t1 = Date()
             // Front-to-back order, so the first sizable normal-layer window is the one the person is looking at.
             guard let win = content.windows.first(where: {
-                $0.owningApplication?.processID == pid && $0.windowLayer == 0 && $0.frame.width >= 200 && $0.frame.height >= 120
+                $0.owningApplication?.processID == pid && $0.windowLayer == 0 && $0.frame.width >= 400 && $0.frame.height >= 300   // a hollow big window; small dialogs are read fine by AX
             }) else { return [] }
 
             var scale = NSScreen.main?.backingScaleFactor ?? 2
