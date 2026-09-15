@@ -27,7 +27,7 @@ public enum AXReader {
         var out: [UIElement] = []
         var truncated = false
         var stack: [(AXUIElement, Int, [String])] = []
-        for child in childElements(of: appElement).reversed() { stack.append((child, 0, [])) }
+        for child in topLevelChildren(of: appElement).reversed() { stack.append((child, 0, [])) }
 
         while let (element, depth, ancestry) = stack.popLast() {
             if out.count >= limits.maxElements { truncated = true; break }
@@ -102,6 +102,27 @@ public enum AXReader {
             info.children = elements(arr[11]) ?? []
         }
         return info
+    }
+
+    /// The app's windows and menu bar, minus the ordinary windows that aren't in front. A control in a
+    /// window behind the focused one (a second Safari window, a minimized one) can't be clicked from
+    /// where the person is, so it must never win a match. Dialogs, panels, and menus stay.
+    private static func topLevelChildren(of appElement: AXUIElement) -> [AXUIElement] {
+        let children = childElements(of: appElement)
+        var focusedRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedRef) != .success || focusedRef == nil {
+            AXUIElementCopyAttributeValue(appElement, kAXMainWindowAttribute as CFString, &focusedRef)
+        }
+        guard let ref = focusedRef, CFGetTypeID(ref) == AXUIElementGetTypeID() else { return children }
+        let focused = unsafeBitCast(ref, to: AXUIElement.self)
+        return children.filter { child in
+            var roleRef: CFTypeRef?, subroleRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(child, kAXRoleAttribute as CFString, &roleRef)
+            guard (roleRef as? String) == "AXWindow" else { return true }
+            if CFEqual(child, focused) { return true }
+            AXUIElementCopyAttributeValue(child, kAXSubroleAttribute as CFString, &subroleRef)
+            return (subroleRef as? String) != "AXStandardWindow"
+        }
     }
 
     private static func childElements(of element: AXUIElement) -> [AXUIElement] {

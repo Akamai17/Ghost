@@ -30,6 +30,9 @@ public struct UIElement: Identifiable, Hashable, Sendable {
     public var title: String { labels.first ?? "" }
     public var center: CGPoint { CGPoint(x: frame.midX, y: frame.midY) }
     public var isInteractive: Bool { Role.interactive.contains(role) }
+    /// A tab in a tab bar (Safari, Chrome, Finder). Its title is the page's title, not a control
+    /// on the page, so it only counts when someone means that exact tab.
+    public var isTabSwitcher: Bool { subrole == "AXTabButton" || role == "AXTab" }
     public var roleName: String { Role.humanName(for: role, subrole: subrole) }
 
     /// Short breadcrumb for display, e.g. "Toolbar › Group". Skips structural noise.

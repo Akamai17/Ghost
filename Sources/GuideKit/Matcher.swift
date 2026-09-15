@@ -76,6 +76,9 @@ public enum Matcher {
             best = max(best, s)
         }
         guard best > 0 else { return 0 }
+        // With thirty tabs open, some tab's title starts with almost any short label ("Sign in" vs the
+        // tab "Sign in to your account"). A tab is only a match when the label is (nearly) its whole title.
+        if element.isTabSwitcher, best < 0.85 { return 0 }
 
         let roleWeight: Double = element.isInteractive ? 1.0 : (element.role == "AXStaticText" ? 0.7 : 0.45)
         let enabledWeight = element.isEnabled ? 1.0 : 0.6

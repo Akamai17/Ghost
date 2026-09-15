@@ -65,6 +65,7 @@ public enum SnapshotSerializer {
             var l = "#\(e.id) \(e.roleName)"
             if let sub = e.subrole, sub != "AXUnknown" { l += "/\(sub.dropFirst(2))" }
             l += " \"\(e.title.prefix(80))\""
+            if e.isTabSwitcher { l += " (open tab)" }
             if e.labels.count > 1 { l += " alt=\"\(e.labels[1].prefix(40))\"" }
             let crumb = e.breadcrumb
             if !crumb.isEmpty { l += " in \(crumb)" }

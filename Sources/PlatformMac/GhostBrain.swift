@@ -14,7 +14,9 @@ public enum GhostBrain {
     coordinates are in points, origin top-left). Ghost cannot type, scroll, or open apps for the user — it can only point at one control at a time and wait for them to click it. \
     Controls listed as \"Text on screen\" were read off the pixels because the app hides its controls from the accessibility tree; \
     each one is the label of whatever sits there (a sidebar item, button, tab), so point at it like any control. In such apps the list is only text, \
-    so plan clicks on the words a person would click, and give element_id for the first step as usual.
+    so plan clicks on the words a person would click, and give element_id for the first step as usual. \
+    Entries marked \"(open tab)\" are the other tabs in a browser or Finder window; their titles are page titles, not controls. \
+    Point at one only to switch to that page, using its full title as the target, and never as a stand-in for a button or link on the current page.
 
     Decide whether the goal can be started from what is on screen right now.
 
