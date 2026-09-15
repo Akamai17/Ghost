@@ -16,6 +16,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildStatusItem()
+        PixelReader.warmUp()
 
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
             guard let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
@@ -115,7 +116,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     @objc private func copySnapshot() {
         guard AXIsProcessTrusted(), let app = targetApp() else { permissions.show(); return }
         DispatchQueue.global(qos: .userInitiated).async {
-            let text = AXReader.describe(AXReader.snapshot(of: app))
+            let text = AXReader.describe(Sight.snapshot(of: app))
             DispatchQueue.main.async {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(text, forType: .string)

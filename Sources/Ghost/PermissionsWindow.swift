@@ -6,6 +6,7 @@ import PlatformMac
 @MainActor
 final class PermissionsModel: ObservableObject {
     @Published var trusted = AXIsProcessTrusted()
+    @Published var screen = PixelReader.hasPermission
     @Published var apiKeyDraft = ""
     @Published var hasKey = Keychain.hasAPIKey
 
@@ -24,11 +25,25 @@ final class PermissionsModel: ObservableObject {
     func startPolling() {
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.trusted = AXIsProcessTrusted() }
+            Task { @MainActor in
+                self?.trusted = AXIsProcessTrusted()
+                self?.screen = PixelReader.hasPermission
+                if self?.screen == true { PixelReader.warmUp() }
+            }
         }
     }
 
     func stopPolling() { timer?.invalidate(); timer = nil }
+
+    func requestScreen() {
+        // The system prompt only ever appears once; after that the only way in is the Settings pane.
+        if !UserDefaults.standard.bool(forKey: "screen.requested") {
+            UserDefaults.standard.set(true, forKey: "screen.requested")
+            screen = PixelReader.requestPermission()
+        } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
 
     func requestAccess() {
         // Go straight to the pane; the system's own "open System Settings?" alert would be a second, redundant prompt.
@@ -45,7 +60,7 @@ final class PermissionsWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 560),
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 680),
                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
             w.title = "Ghost"
             w.titlebarAppearsTransparent = true
@@ -57,6 +72,7 @@ final class PermissionsWindowController: NSObject, NSWindowDelegate {
             window = w
         }
         model.trusted = AXIsProcessTrusted()
+        model.screen = PixelReader.hasPermission
         model.startPolling()
         NSApp.activate(ignoringOtherApps: true)
         window?.center()
@@ -101,7 +117,17 @@ struct PermissionsView: View {
 
             Divider().padding(.vertical, 18)
 
-            step(number: 2, done: false, title: "Summon it anywhere", detail: "Tap Control twice. Type what you're trying to do. Press Return.") {
+            step(number: 2, done: model.screen, title: "Screen Recording (optional)",
+                 detail: "Some apps — Spotify, Discord, anything built on Chrome — hide their controls from Accessibility. With Screen Recording, Ghost reads the text off the window instead. Screenshots never leave your Mac; macOS may ask to reopen Ghost.") {
+                if !model.screen {
+                    Button("Allow Screen Recording") { model.requestScreen() }
+                        .buttonStyle(.bordered)
+                }
+            }
+
+            Divider().padding(.vertical, 18)
+
+            step(number: 3, done: false, title: "Summon it anywhere", detail: "Tap Control twice. Type what you're trying to do. Press Return.") {
                 HStack(spacing: 6) {
                     keycap("⌃"); keycap("⌃")
                     Text("in any app").font(.system(size: 12)).foregroundStyle(.secondary).padding(.leading, 4)
@@ -110,7 +136,7 @@ struct PermissionsView: View {
 
             Divider().padding(.vertical, 18)
 
-            step(number: 3, done: model.hasKey, title: "GhostBrain (optional)",
+            step(number: 4, done: model.hasKey, title: "GhostBrain (optional)",
                  detail: "When a plain search can't find it, GhostBrain sends your goal, what's on screen, and your Mac's specs to Claude and walks you through the steps. Your key is kept in a private file only your user can read.") {
                 if model.hasKey {
                     HStack(spacing: 10) {
@@ -145,7 +171,7 @@ struct PermissionsView: View {
             }
         }
         .padding(28)
-        .frame(width: 460, height: 560, alignment: .top)
+        .frame(width: 460, height: 680, alignment: .top)
     }
 
     private func step<Content: View>(number: Int, done: Bool, title: String, detail: String, @ViewBuilder content: () -> Content) -> some View {

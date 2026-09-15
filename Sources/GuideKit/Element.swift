@@ -48,6 +48,7 @@ public enum Role {
         "AXMenuItem", "AXMenuBarItem", "AXTextField", "AXTextArea", "AXSearchField",
         "AXLink", "AXTab", "AXSlider", "AXIncrementor", "AXComboBox", "AXDisclosureTriangle",
         "AXRow", "AXCell", "AXColorWell", "AXDateField", "AXTimeField", "AXStepper", "AXSwitch", "AXDockItem",
+        "AXOCRText",   // text read off the pixels when an app hides its controls
     ]
 
     /// Containers that carry no meaning for a person reading a breadcrumb.
@@ -108,6 +109,7 @@ public enum Role {
         case "AXWindow": return "Window"
         case "AXSwitch": return "Switch"
         case "AXDockItem": return "Dock icon"
+        case "AXOCRText": return "Text on screen"
         default: return role.hasPrefix("AX") ? String(role.dropFirst(2)) : role
         }
     }

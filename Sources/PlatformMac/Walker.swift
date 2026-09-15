@@ -73,7 +73,7 @@ public final class Walker {
         let maxRetries = app.processIdentifier == startApp.processIdentifier ? 4 : 8
 
         DispatchQueue.global(qos: .userInitiated).async { [firstSnapshot] in
-            let snap = (isFirst && retries == 0) ? (firstSnapshot ?? AXReader.snapshot(of: app)) : AXReader.snapshot(of: app)
+            let snap = (isFirst && retries == 0) ? (firstSnapshot ?? Sight.snapshot(of: app)) : Sight.snapshot(of: app)
             var found: UIElement?
             if isFirst, let id = step.elementID, id >= 0, id < snap.elements.count {
                 found = snap.elements[id]
@@ -82,7 +82,7 @@ public final class Walker {
                 found = m.element
             }
             let best = Matcher.rank(step.target, in: snap.elements, limit: 1).first
-            Log.write("step \(self.index + 1) try \(retries) app=\(snap.appName) elements=\(snap.elements.count) \(Int(snap.duration * 1000))ms target=\"\(step.target)\" best=\(best.map { "\"\($0.element.title)\" \(String(format: "%.2f", $0.score))" } ?? "none") found=\(found != nil)")
+            Log.write("step \(self.index + 1) try \(retries) app=\(snap.appName) elements=\(snap.elements.count) ocr=\(snap.elements.filter { $0.role == PixelReader.role }.count) \(Int(snap.duration * 1000))ms target=\"\(step.target)\" best=\(best.map { "\"\($0.element.title)\" \(String(format: "%.2f", $0.score))" } ?? "none") found=\(found != nil)")
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.generation else { return }
                 if let found {
@@ -173,6 +173,12 @@ public final class Walker {
                     Log.write("replan: nothing to do here — \(fresh.advice.prefix(120))")
                     self.plan = nil
                     self.onFinished?(false, fresh.advice.isEmpty ? "Couldn't continue from here" : fresh.advice)
+                    return
+                }
+                if let old = self.plan, old.steps.map(\.target) == fresh.steps.map(\.target) {
+                    Log.write("replan: same plan back, stopping")
+                    self.plan = nil
+                    self.onFinished?(false, "Ghost can't see “\(missing.target)” in \(snapshot.appName). " + (fresh.advice.isEmpty ? "Try that step yourself, then summon Ghost again." : fresh.advice))
                     return
                 }
                 Log.write("replan ok steps=\(fresh.steps.map { "\($0.verb) \"\($0.target)\"" })")

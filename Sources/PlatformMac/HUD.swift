@@ -243,7 +243,7 @@ public final class HUDController {
         }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let snap = AXReader.snapshot(of: app)
+            let snap = Sight.snapshot(of: app)
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.generation else { return }
                 self.model.snapshot = snap
@@ -464,6 +464,7 @@ struct HUDView: View {
         case "AXLink": return "link"
         case "AXTab": return "rectangle.topthird.inset.filled"
         case "AXStaticText", "AXHeading": return "text.alignleft"
+        case "AXOCRText": return "text.viewfinder"
         case "AXImage": return "photo"
         case "AXRow", "AXCell": return "list.bullet"
         case "AXSlider", "AXIncrementor", "AXStepper": return "slider.horizontal.3"
