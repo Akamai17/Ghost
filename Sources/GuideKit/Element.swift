@@ -47,7 +47,7 @@ public enum Role {
         "AXButton", "AXMenuButton", "AXPopUpButton", "AXCheckBox", "AXRadioButton",
         "AXMenuItem", "AXMenuBarItem", "AXTextField", "AXTextArea", "AXSearchField",
         "AXLink", "AXTab", "AXSlider", "AXIncrementor", "AXComboBox", "AXDisclosureTriangle",
-        "AXRow", "AXCell", "AXColorWell", "AXDateField", "AXTimeField", "AXStepper", "AXSwitch",
+        "AXRow", "AXCell", "AXColorWell", "AXDateField", "AXTimeField", "AXStepper", "AXSwitch", "AXDockItem",
     ]
 
     /// Containers that carry no meaning for a person reading a breadcrumb.
@@ -107,6 +107,7 @@ public enum Role {
         case "AXHeading": return "Heading"
         case "AXWindow": return "Window"
         case "AXSwitch": return "Switch"
+        case "AXDockItem": return "Dock icon"
         default: return role.hasPrefix("AX") ? String(role.dropFirst(2)) : role
         }
     }

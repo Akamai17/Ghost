@@ -61,6 +61,11 @@ public final class Walker {
         let gen = generation
         let isFirst = index == 0
         let label = "\(index + 1)/\(plan.steps.count) · \(step.note)"
+
+        if let name = step.app, !name.isEmpty {
+            bringToFront(name, step: step, label: label, gen: gen)
+            return
+        }
         // A freshly launched app needs longer to put its window up.
         let maxRetries = app.processIdentifier == startApp.processIdentifier ? 4 : 8
 
@@ -94,6 +99,61 @@ public final class Walker {
                 }
             }
         }
+    }
+
+    /// Point at the app's Dock icon; if it isn't in the Dock, open it directly and move on.
+    private func bringToFront(_ name: String, step: BrainPlan.Step, label: String, gen: Int) {
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != me,
+           (front.localizedName ?? "").caseInsensitiveCompare(name) == .orderedSame {
+            Log.write("step \(index + 1) app \"\(name)\" already frontmost")
+            stepFinished(clicked: true)
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            var icon: UIElement?
+            if let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first {
+                let items = AXReader.snapshot(of: dock).elements.filter { $0.role == "AXDockItem" }
+                icon = items.first { $0.title.caseInsensitiveCompare(name) == .orderedSame }
+                    ?? Matcher.rank(name, in: items, limit: 1).first.flatMap { $0.score >= 0.8 ? $0.element : nil }
+            }
+            Log.write("step \(self.index + 1) app \"\(name)\" dock=\(icon?.title ?? "none")")
+            DispatchQueue.main.async { [weak self] in
+                guard let self, gen == self.generation else { return }
+                if let icon {
+                    self.overlay.show(icon, verb: step.verb.isEmpty ? "Open" : step.verb, note: label)
+                    return
+                }
+                // Not in the Dock: open it for them.
+                let running = NSWorkspace.shared.runningApplications.first { ($0.localizedName ?? "").caseInsensitiveCompare(name) == .orderedSame }
+                if let running {
+                    running.activate()
+                } else if let url = self.applicationURL(named: name) {
+                    NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                } else {
+                    self.plan = nil
+                    self.onFinished?(false, "Couldn't find an app called “\(name)”")
+                    return
+                }
+                self.overlay.showToast("Opening \(name)…")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    guard let self, gen == self.generation else { return }
+                    self.overlay.hideToast()
+                    self.stepFinished(clicked: true)
+                }
+            }
+        }
+    }
+
+    private func applicationURL(named name: String) -> URL? {
+        let fm = FileManager.default
+        for dir in ["/Applications", "/System/Applications", "/System/Applications/Utilities", (fm.homeDirectoryForCurrentUser.path + "/Applications")] {
+            guard let names = try? fm.contentsOfDirectory(atPath: dir) else { continue }
+            if let hit = names.first(where: { $0.lowercased() == name.lowercased() + ".app" }) {
+                return URL(fileURLWithPath: dir).appendingPathComponent(hit)
+            }
+        }
+        return nil
     }
 
     private func replan(with replanner: @escaping (String, [String], Snapshot, NSRunningApplication) async throws -> BrainPlan,

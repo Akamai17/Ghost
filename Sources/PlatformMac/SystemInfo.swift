@@ -23,6 +23,19 @@ public enum SystemInfo {
         return lines.joined(separator: "\n")
     }
 
+    public static func runningApps() -> [String] {
+        NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap { $0.localizedName }
+            .sorted()
+    }
+
+    /// Titles of the app tiles in the Dock, read through its accessibility tree.
+    public static func dockApps() -> [String] {
+        guard let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { return [] }
+        return AXReader.snapshot(of: dock).elements.filter { $0.role == "AXDockItem" }.map(\.title)
+    }
+
     static func marketingName(_ major: Int) -> String {
         switch major {
         case 14: return "Sonoma"

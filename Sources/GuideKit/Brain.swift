@@ -10,8 +10,10 @@ public struct BrainPlan: Codable, Sendable {
         public let target: String
         public let verb: String
         public let note: String
+        /// Set when this step is "bring this app to the front" rather than a click inside the current app.
+        public let app: String?
 
-        enum CodingKeys: String, CodingKey { case elementID = "element_id", target, verb, note }
+        enum CodingKeys: String, CodingKey { case elementID = "element_id", target, verb, note, app }
     }
 
     public let found: Bool

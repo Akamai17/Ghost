@@ -17,6 +17,8 @@ public enum GhostBrain {
 
     If it can, set found=true and return the steps as a sequence of single clicks. For the first step, give the element_id of the control from the list. \
     For later steps the screen will have changed, so give element_id=null and a target label that will appear on the control (match the exact wording macOS uses on this version). \
+    If the goal is about an app that is not frontmost, make the first step bring it to the front: set app to the app's name, target to the same name, verb "Open", element_id null. \
+    Ghost points at its Dock icon (or opens it if it isn't in the Dock). Later steps happen inside that app; you haven't seen its screen, so use the labels that app normally shows. \
     Steps may cross apps: if a click opens another app (for example a menu item that opens System Settings), keep going with steps inside that app. \
     Keep steps to what a person needs; a step's note is one short sentence explaining why, in plain language for someone who isn't technical. Verbs are short: Click, Open, Toggle, Choose, Select.
 
@@ -40,8 +42,9 @@ public enum GhostBrain {
                         "target": ["type": "string"],
                         "verb": ["type": "string"],
                         "note": ["type": "string"],
+                        "app": ["type": ["string", "null"]],
                     ],
-                    "required": ["element_id", "target", "verb", "note"],
+                    "required": ["element_id", "target", "verb", "note", "app"],
                     "additionalProperties": false,
                 ],
             ],
@@ -60,6 +63,9 @@ public enum GhostBrain {
         \(progress)
         MACHINE:
         \(await MainActor.run { SystemInfo.describe(app: app) })
+
+        RUNNING APPS: \(await MainActor.run { SystemInfo.runningApps() }.joined(separator: ", "))
+        IN THE DOCK: \(await MainActor.run { SystemInfo.dockApps() }.joined(separator: ", "))
 
         VISIBLE CONTROLS in \(snapshot.appName) (\(snapshot.elements.count) total\(snapshot.truncated ? ", list truncated" : "")):
         \(SnapshotSerializer.render(snapshot))
