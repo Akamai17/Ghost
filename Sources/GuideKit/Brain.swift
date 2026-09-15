@@ -18,12 +18,20 @@ public struct BrainPlan: Codable, Sendable {
         public var needsTyping: Bool { typing ?? false }
 
         enum CodingKeys: String, CodingKey { case elementID = "element_id", target, verb, note, app, typing }
+
+        public init(elementID: Int?, target: String, verb: String, note: String, app: String?, typing: Bool?) {
+            self.elementID = elementID; self.target = target; self.verb = verb; self.note = note; self.app = app; self.typing = typing
+        }
     }
 
     public let found: Bool
     public let summary: String
     public let steps: [Step]
     public let advice: String
+
+    public init(found: Bool, summary: String, steps: [Step], advice: String) {
+        self.found = found; self.summary = summary; self.steps = steps; self.advice = advice
+    }
 }
 
 public enum BrainError: Error, LocalizedError {

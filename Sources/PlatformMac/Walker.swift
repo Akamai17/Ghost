@@ -17,6 +17,8 @@ public final class Walker {
     private var generation = 0
     private var goal = ""
     private var completed: [String] = []
+    /// Every step the person clicked through in this walk, across replans. Valid after onFinished.
+    public private(set) var completedSteps: [BrainPlan.Step] = []
     private var replans = 0
 
     public var isWalking: Bool { plan != nil }
@@ -34,6 +36,7 @@ public final class Walker {
         self.firstSnapshot = snapshot
         index = 0
         completed = []
+        completedSteps = []
         replans = 0
         generation += 1
         Log.write("walk start goal=\"\(goal)\" app=\(app.localizedName ?? "?") steps=\(plan.steps.map { "\($0.verb) \"\($0.target)\"#\($0.elementID.map(String.init) ?? "-")\($0.needsTyping ? " ⌨" : "")" })")
@@ -210,6 +213,7 @@ public final class Walker {
             return
         }
         completed.append(plan.steps[index].target)
+        completedSteps.append(plan.steps[index])
         index += 1
         if index >= plan.steps.count {
             Log.write("walk done")

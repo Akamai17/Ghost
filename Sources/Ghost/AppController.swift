@@ -12,6 +12,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     private lazy var walker = Walker(overlay: overlay)
     private let permissions = PermissionsWindowController()
     private var lastFrontmost: NSRunningApplication?
+    /// What the current walk was asked for and where it came from, so a finished walk can be remembered or a stale one dropped.
+    private var walkOrigin: (goal: String, bundle: String?, fromCache: Bool)?
     private var trustPoll: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -33,10 +35,20 @@ final class AppController: NSObject, NSApplicationDelegate {
         hud.onBrain = { [weak self] goal, snapshot, app in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                let bundle = app.bundleIdentifier
+                // Same ask as before? Walk the remembered steps and skip the API call.
+                if let remembered = PlanCache.lookup(goal: goal, bundleID: bundle) {
+                    self.walkOrigin = (goal, bundle, fromCache: true)
+                    if let plan = self.hud.brainAnswered(.success(remembered)) {
+                        self.walker.start(plan, goal: goal, app: app, snapshot: snapshot)
+                    }
+                    return
+                }
                 let result: Result<BrainPlan, Error>
                 do { result = .success(try await GhostBrain.plan(goal: goal, snapshot: snapshot, app: app)) }
                 catch { result = .failure(error) }
                 if let plan = self.hud.brainAnswered(result) {
+                    self.walkOrigin = (goal, bundle, fromCache: false)
                     self.walker.start(plan, goal: goal, app: app, snapshot: snapshot)
                 }
             }
@@ -45,7 +57,16 @@ final class AppController: NSObject, NSApplicationDelegate {
             try await GhostBrain.plan(goal: goal, snapshot: snapshot, app: app, completed: done)
         }
         walker.onFinished = { [weak self] ok, message in
-            guard let self, !ok else { return }
+            guard let self else { return }
+            if let (goal, bundle, fromCache) = self.walkOrigin {
+                self.walkOrigin = nil
+                if ok, !fromCache {
+                    PlanCache.remember(goal: goal, bundleID: bundle, summary: message, steps: self.walker.completedSteps)
+                } else if !ok, fromCache {
+                    PlanCache.forget(goal: goal, bundleID: bundle)
+                }
+            }
+            guard !ok else { return }
             // Bring the HUD back with the reason so a stall isn't silent.
             if let app = self.targetApp() {
                 self.hud.show(for: app)
@@ -102,6 +123,9 @@ final class AppController: NSObject, NSApplicationDelegate {
         let dump = NSMenuItem(title: "Copy element snapshot", action: #selector(copySnapshot), keyEquivalent: "")
         dump.target = self
         menu.addItem(dump)
+        let forget = NSMenuItem(title: "Forget remembered walks", action: #selector(forgetWalks), keyEquivalent: "")
+        forget.target = self
+        menu.addItem(forget)
         let setup = NSMenuItem(title: "Setup & Permissions…", action: #selector(showSetup), keyEquivalent: "")
         setup.target = self
         menu.addItem(setup)
@@ -112,6 +136,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSetup() { permissions.show() }
+
+    @objc private func forgetWalks() { PlanCache.clear() }
 
     @objc private func copySnapshot() {
         guard AXIsProcessTrusted(), let app = targetApp() else { permissions.show(); return }
