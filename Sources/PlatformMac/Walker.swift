@@ -62,7 +62,10 @@ public final class Walker {
         let isFirst = index == 0
         let label = "\(index + 1)/\(plan.steps.count) · \(step.note)"
 
-        if let name = step.app, !name.isEmpty {
+        // A step is an app switch only when its whole job is the app itself; models also like to
+        // tag every in-app click with the app's name, and those must stay ordinary clicks.
+        if let name = step.app, !name.isEmpty,
+           step.target.isEmpty || step.target.caseInsensitiveCompare(name) == .orderedSame {
             bringToFront(name, step: step, label: label, gen: gen)
             return
         }

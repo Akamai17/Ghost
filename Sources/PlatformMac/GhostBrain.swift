@@ -18,7 +18,9 @@ public enum GhostBrain {
     If it can, set found=true and return the steps as a sequence of single clicks. For the first step, give the element_id of the control from the list. \
     For later steps the screen will have changed, so give element_id=null and a target label that will appear on the control (match the exact wording macOS uses on this version). \
     If the goal is about an app that is not frontmost, make the first step bring it to the front: set app to the app's name, target to the same name, verb "Open", element_id null. \
-    Ghost points at its Dock icon (or opens it if it isn't in the Dock). Later steps happen inside that app; you haven't seen its screen, so use the labels that app normally shows. \
+    Ghost points at its Dock icon (or opens it if it isn't in the Dock). The app field is ONLY for that kind of step — every click inside an app has app=null. \
+    Later steps happen inside that app; you haven't seen its screen, so use the labels that app normally shows. \
+    If a step would need the user to type something (a search box, a name), say so in that step's note — Ghost can point at the field but the user types. \
     Steps may cross apps: if a click opens another app (for example a menu item that opens System Settings), keep going with steps inside that app. \
     Keep steps to what a person needs; a step's note is one short sentence explaining why, in plain language for someone who isn't technical. Verbs are short: Click, Open, Toggle, Choose, Select.
 
