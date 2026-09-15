@@ -6,6 +6,8 @@ import GuideKit
 public final class Walker {
     public var onStatus: ((String) -> Void)?
     public var onFinished: ((Bool, String) -> Void)?
+    /// Asked to produce a fresh plan from the current screen when a step's label can't be found.
+    public var replanner: ((_ goal: String, _ done: [String], _ snapshot: Snapshot, _ app: NSRunningApplication) async throws -> BrainPlan)?
 
     private let overlay: OverlayController
     private var plan: BrainPlan?
@@ -13,6 +15,9 @@ public final class Walker {
     private var index = 0
     private var firstSnapshot: Snapshot?
     private var generation = 0
+    private var goal = ""
+    private var completed: [String] = []
+    private var replans = 0
 
     public var isWalking: Bool { plan != nil }
 
@@ -20,30 +25,44 @@ public final class Walker {
         self.overlay = overlay
     }
 
-    public func start(_ plan: BrainPlan, app: NSRunningApplication, snapshot: Snapshot) {
+    public func start(_ plan: BrainPlan, goal: String, app: NSRunningApplication, snapshot: Snapshot) {
         cancel()
         guard !plan.steps.isEmpty else { return }
         self.plan = plan
+        self.goal = goal
         self.app = app
         self.firstSnapshot = snapshot
         index = 0
+        completed = []
+        replans = 0
         generation += 1
+        Log.write("walk start goal=\"\(goal)\" app=\(app.localizedName ?? "?") steps=\(plan.steps.map { "\($0.verb) \"\($0.target)\"#\($0.elementID.map(String.init) ?? "-")" })")
         overlay.onResult = { [weak self] clicked in self?.stepFinished(clicked: clicked) }
         showCurrent(retries: 0)
     }
 
     public func cancel() {
+        if plan != nil { Log.write("walk cancel at step \(index + 1)") }
         plan = nil
         generation += 1
         if overlay.isShowing { overlay.dismiss() }
     }
 
+    /// Steps can cross apps (a menu item opens System Settings), so follow whatever is in front.
+    private func currentApp() -> NSRunningApplication? {
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != me { return front }
+        return app
+    }
+
     private func showCurrent(retries: Int) {
-        guard let plan, let app, index < plan.steps.count else { return }
+        guard let plan, let startApp = app, let app = currentApp(), index < plan.steps.count else { return }
         let step = plan.steps[index]
         let gen = generation
         let isFirst = index == 0
         let label = "\(index + 1)/\(plan.steps.count) · \(step.note)"
+        // A freshly launched app needs longer to put its window up.
+        let maxRetries = app.processIdentifier == startApp.processIdentifier ? 4 : 8
 
         DispatchQueue.global(qos: .userInitiated).async { [firstSnapshot] in
             let snap = (isFirst && retries == 0) ? (firstSnapshot ?? AXReader.snapshot(of: app)) : AXReader.snapshot(of: app)
@@ -54,16 +73,22 @@ public final class Walker {
             if found == nil, let m = Matcher.rank(step.target, in: snap.elements, limit: 1).first, m.score >= 0.5 {
                 found = m.element
             }
+            let best = Matcher.rank(step.target, in: snap.elements, limit: 1).first
+            Log.write("step \(self.index + 1) try \(retries) app=\(snap.appName) elements=\(snap.elements.count) \(Int(snap.duration * 1000))ms target=\"\(step.target)\" best=\(best.map { "\"\($0.element.title)\" \(String(format: "%.2f", $0.score))" } ?? "none") found=\(found != nil)")
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.generation else { return }
                 if let found {
                     self.overlay.show(found, verb: step.verb, note: label)
-                } else if retries < 4 {
+                } else if retries < maxRetries {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                         guard let self, gen == self.generation else { return }
                         self.showCurrent(retries: retries + 1)
                     }
+                } else if let replanner = self.replanner, self.replans < 2 {
+                    self.replans += 1
+                    self.replan(with: replanner, snapshot: snap, app: app, missing: step)
                 } else {
+                    Log.write("walk fail: \"\(step.target)\" not found")
                     self.plan = nil
                     self.onFinished?(false, "Couldn't find “\(step.target)” on screen — \(step.note)")
                 }
@@ -71,15 +96,49 @@ public final class Walker {
         }
     }
 
+    private func replan(with replanner: @escaping (String, [String], Snapshot, NSRunningApplication) async throws -> BrainPlan,
+                        snapshot: Snapshot, app: NSRunningApplication, missing: BrainPlan.Step) {
+        let gen = generation
+        Log.write("replan #\(replans) in \(snapshot.appName), missing \"\(missing.target)\", done=\(completed)")
+        overlay.showToast("Re-checking the screen…")
+        Task { @MainActor [weak self] in
+            do {
+                let fresh = try await replanner(self?.goal ?? "", self?.completed ?? [], snapshot, app)
+                guard let self, gen == self.generation else { return }
+                self.overlay.hideToast()
+                guard fresh.found, !fresh.steps.isEmpty else {
+                    Log.write("replan: nothing to do here — \(fresh.advice.prefix(120))")
+                    self.plan = nil
+                    self.onFinished?(false, fresh.advice.isEmpty ? "Couldn't continue from here" : fresh.advice)
+                    return
+                }
+                Log.write("replan ok steps=\(fresh.steps.map { "\($0.verb) \"\($0.target)\"" })")
+                self.plan = fresh
+                self.index = 0
+                self.firstSnapshot = snapshot
+                self.showCurrent(retries: 0)
+            } catch {
+                guard let self, gen == self.generation else { return }
+                self.overlay.hideToast()
+                Log.write("replan error: \(error.localizedDescription)")
+                self.plan = nil
+                self.onFinished?(false, "Couldn't find “\(missing.target)” — \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func stepFinished(clicked: Bool) {
         guard let plan else { return }
+        Log.write("step \(index + 1) finished clicked=\(clicked)")
         guard clicked else {
             self.plan = nil
             onFinished?(false, "Stopped at step \(index + 1) of \(plan.steps.count)")
             return
         }
+        completed.append(plan.steps[index].target)
         index += 1
         if index >= plan.steps.count {
+            Log.write("walk done")
             self.plan = nil
             onFinished?(true, "Done — \(plan.summary)")
             return

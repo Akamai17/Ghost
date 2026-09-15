@@ -23,6 +23,59 @@ public final class OverlayController {
 
     public init() {}
 
+    // MARK: - Toast (status while nothing is being pointed at)
+
+    private var toast: NSPanel?
+
+    public func showToast(_ text: String) {
+        hideToast()
+        guard let screen = NSScreen.main else { return }
+        let panel = NSPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.level = .floating
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+
+        let effect = NSVisualEffectView()
+        effect.material = .hudWindow
+        effect.blendingMode = .behindWindow
+        effect.state = .active
+        effect.wantsLayer = true
+        effect.layer?.cornerRadius = 12
+        effect.layer?.cornerCurve = .continuous
+        effect.layer?.masksToBounds = true
+
+        let spinner = NSProgressIndicator()
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.startAnimation(nil)
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 13, weight: .medium)
+        let stack = NSStackView(views: [spinner, label])
+        stack.orientation = .horizontal
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: 9, left: 14, bottom: 9, right: 16)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        effect.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: effect.leadingAnchor), stack.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: effect.topAnchor), stack.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
+        ])
+        panel.contentView = effect
+        let size = stack.fittingSize
+        let vf = screen.visibleFrame
+        panel.setFrame(NSRect(x: vf.midX - size.width / 2, y: vf.minY + 48, width: size.width, height: size.height), display: true)
+        panel.orderFrontRegardless()
+        toast = panel
+    }
+
+    public func hideToast() {
+        toast?.orderOut(nil)
+        toast = nil
+    }
+
     public func show(_ element: UIElement, verb: String = "Click", note: String? = nil) {
         dismiss(animated: false)
         succeeded = false

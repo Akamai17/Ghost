@@ -40,8 +40,15 @@ if [ ! -f Resources/AppIcon.icns ]; then
 fi
 cp Resources/AppIcon.icns "$BUNDLE/Contents/Resources/AppIcon.icns"
 
-echo "▸ Signing (ad-hoc)"
-codesign --force --deep --sign - "$BUNDLE"
+# A stable signing identity keeps the Accessibility grant across rebuilds (TCC keys on it).
+# "Ghost Dev" is a self-signed cert in the login keychain; ad-hoc is the fallback.
+if security find-identity -v -p codesigning 2>/dev/null | grep -q '"Ghost Dev"'; then
+  echo "▸ Signing (Ghost Dev)"
+  codesign --force --deep --sign "Ghost Dev" "$BUNDLE"
+else
+  echo "▸ Signing (ad-hoc — Accessibility will need re-granting after each build)"
+  codesign --force --deep --sign - "$BUNDLE"
+fi
 
 echo "▸ Packaging DMG"
 STAGE=$DIST/dmg

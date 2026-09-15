@@ -36,9 +36,12 @@ final class AppController: NSObject, NSApplicationDelegate {
                 do { result = .success(try await GhostBrain.plan(goal: goal, snapshot: snapshot, app: app)) }
                 catch { result = .failure(error) }
                 if let plan = self.hud.brainAnswered(result) {
-                    self.walker.start(plan, app: app, snapshot: snapshot)
+                    self.walker.start(plan, goal: goal, app: app, snapshot: snapshot)
                 }
             }
+        }
+        walker.replanner = { goal, done, snapshot, app in
+            try await GhostBrain.plan(goal: goal, snapshot: snapshot, app: app, completed: done)
         }
         walker.onFinished = { [weak self] ok, message in
             guard let self, !ok else { return }

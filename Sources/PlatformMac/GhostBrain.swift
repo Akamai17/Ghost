@@ -17,6 +17,7 @@ public enum GhostBrain {
 
     If it can, set found=true and return the steps as a sequence of single clicks. For the first step, give the element_id of the control from the list. \
     For later steps the screen will have changed, so give element_id=null and a target label that will appear on the control (match the exact wording macOS uses on this version). \
+    Steps may cross apps: if a click opens another app (for example a menu item that opens System Settings), keep going with steps inside that app. \
     Keep steps to what a person needs; a step's note is one short sentence explaining why, in plain language for someone who isn't technical. Verbs are short: Click, Open, Toggle, Choose, Select.
 
     If the goal can't be started here (wrong app, needs typing, needs a different window), set found=false, steps=[], and put a short numbered set of directions in advice \
@@ -50,12 +51,13 @@ public enum GhostBrain {
         "additionalProperties": false,
     ]
 
-    public static func plan(goal: String, snapshot: Snapshot, app: NSRunningApplication?) async throws -> BrainPlan {
+    public static func plan(goal: String, snapshot: Snapshot, app: NSRunningApplication?, completed: [String] = []) async throws -> BrainPlan {
         guard let key = Keychain.apiKey else { throw BrainError.noAPIKey }
 
+        let progress = completed.isEmpty ? "" : "\nALREADY DONE (the user clicked these, in order): \(completed.joined(separator: " → ")). Plan only what remains, starting from what is on screen now.\n"
         let userText = """
         GOAL: \(goal)
-
+        \(progress)
         MACHINE:
         \(await MainActor.run { SystemInfo.describe(app: app) })
 
