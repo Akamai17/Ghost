@@ -36,7 +36,7 @@ public final class Walker {
         completed = []
         replans = 0
         generation += 1
-        Log.write("walk start goal=\"\(goal)\" app=\(app.localizedName ?? "?") steps=\(plan.steps.map { "\($0.verb) \"\($0.target)\"#\($0.elementID.map(String.init) ?? "-")" })")
+        Log.write("walk start goal=\"\(goal)\" app=\(app.localizedName ?? "?") steps=\(plan.steps.map { "\($0.verb) \"\($0.target)\"#\($0.elementID.map(String.init) ?? "-")\($0.needsTyping ? " ⌨" : "")" })")
         overlay.onResult = { [weak self] clicked in self?.stepFinished(clicked: clicked) }
         showCurrent(retries: 0)
     }
@@ -69,8 +69,10 @@ public final class Walker {
             bringToFront(name, step: step, label: label, gen: gen)
             return
         }
-        // A freshly launched app needs longer to put its window up.
-        let maxRetries = app.processIdentifier == startApp.processIdentifier ? 4 : 8
+        // A freshly launched app needs longer to put its window up, and a person typing needs longer still.
+        let afterTyping = index > 0 && plan.steps[index - 1].needsTyping
+        let maxRetries = afterTyping ? 30 : (app.processIdentifier == startApp.processIdentifier ? 4 : 8)
+        if afterTyping, retries == 0 { overlay.showToast("Type it in — Ghost is watching for “\(step.target)”") }
 
         DispatchQueue.global(qos: .userInitiated).async { [firstSnapshot] in
             let snap = (isFirst && retries == 0) ? (firstSnapshot ?? Sight.snapshot(of: app)) : Sight.snapshot(of: app)
@@ -86,6 +88,7 @@ public final class Walker {
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.generation else { return }
                 if let found {
+                    if afterTyping { self.overlay.hideToast() }
                     self.overlay.show(found, verb: step.verb, note: label)
                 } else if retries < maxRetries {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
@@ -93,9 +96,11 @@ public final class Walker {
                         self.showCurrent(retries: retries + 1)
                     }
                 } else if let replanner = self.replanner, self.replans < 2 {
+                    if afterTyping { self.overlay.hideToast() }
                     self.replans += 1
                     self.replan(with: replanner, snapshot: snap, app: app, missing: step)
                 } else {
+                    if afterTyping { self.overlay.hideToast() }
                     Log.write("walk fail: \"\(step.target)\" not found")
                     self.plan = nil
                     self.onFinished?(false, "Couldn't find “\(step.target)” on screen — \(step.note)")

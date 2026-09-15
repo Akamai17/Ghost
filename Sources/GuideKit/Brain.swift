@@ -12,8 +12,12 @@ public struct BrainPlan: Codable, Sendable {
         public let note: String
         /// Set when this step is "bring this app to the front" rather than a click inside the current app.
         public let app: String?
+        /// True when the person has to type into this control before the next step can appear.
+        public let typing: Bool?
 
-        enum CodingKeys: String, CodingKey { case elementID = "element_id", target, verb, note, app }
+        public var needsTyping: Bool { typing ?? false }
+
+        enum CodingKeys: String, CodingKey { case elementID = "element_id", target, verb, note, app, typing }
     }
 
     public let found: Bool

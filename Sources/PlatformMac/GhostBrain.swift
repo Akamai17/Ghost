@@ -23,12 +23,16 @@ public enum GhostBrain {
     If the goal is about an app that is not frontmost, make the first step bring it to the front: set app to the app's name, target to the same name, verb "Open", element_id null. \
     Ghost points at its Dock icon (or opens it if it isn't in the Dock). The app field is ONLY for that kind of step — every click inside an app has app=null. \
     Later steps happen inside that app; you haven't seen its screen, so use the labels that app normally shows. \
-    If a step would need the user to type something (a search box, a name), say so in that step's note — Ghost can point at the field but the user types. \
+    If the person must type into the control you're pointing at (a search box, a name field), set typing=true on that step and put what to type, and whether to press Return, \
+    in its note. Never add a second step for the same field. Ghost then waits for them to type and looks for the next step's target, so that target must be something \
+    that appears only after typing (a result, a heading, a button). \
     Steps may cross apps: if a click opens another app (for example a menu item that opens System Settings), keep going with steps inside that app. \
     Keep steps to what a person needs; a step's note is one short sentence explaining why, in plain language for someone who isn't technical. Verbs are short: Click, Open, Toggle, Choose, Select.
 
-    If the goal can't be started here (wrong app, needs typing, needs a different window), set found=false, steps=[], and put a short numbered set of directions in advice \
-    that are specific to this macOS version and this Mac. Never invent controls that are not in the list for the first step.
+    If the goal can't be started here (wrong app, needs a different window), set found=false, steps=[], and put a short numbered set of directions in advice \
+    that are specific to this macOS version and this Mac. Never invent controls that are not in the list for the first step. \
+    When you are re-planning mid-task and the next thing isn't visible yet, assume the page hasn't loaded or the person hasn't typed yet: plan from what is on screen \
+    (pointing at the field again with typing=true is fine). Only say a feature doesn't exist when the screen shows that; never from memory of an app version.
 
     summary is one line describing what you're about to walk them through.
     """
@@ -48,8 +52,9 @@ public enum GhostBrain {
                         "verb": ["type": "string"],
                         "note": ["type": "string"],
                         "app": ["type": ["string", "null"]],
+                        "typing": ["type": "boolean"],
                     ],
-                    "required": ["element_id", "target", "verb", "note", "app"],
+                    "required": ["element_id", "target", "verb", "note", "app", "typing"],
                     "additionalProperties": false,
                 ],
             ],
