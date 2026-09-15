@@ -74,6 +74,7 @@ public enum GhostBrain {
         MACHINE:
         \(await MainActor.run { SystemInfo.describe(app: app) })
 
+        \(AppHints.text(for: app?.bundleIdentifier).map { "HOW \(snapshot.appName) WORKS (from someone who uses it daily — prefer these paths):\n\($0)\n" } ?? "")
         RUNNING APPS: \(await MainActor.run { SystemInfo.runningApps() }.joined(separator: ", "))
         IN THE DOCK: \(await MainActor.run { SystemInfo.dockApps() }.joined(separator: ", "))
 
