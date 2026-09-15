@@ -54,9 +54,13 @@ public enum Matcher {
             if l == q {
                 s = 1.0
             } else if l.hasPrefix(q) {
-                s = 0.85
+                // "To:" must not claim "To stop receiving these messages…": a prefix is only strong
+                // when it covers a good share of the label.
+                let coverage = Double(q.count) / Double(l.count)
+                s = coverage >= 0.5 ? 0.85 : (coverage >= 0.25 ? 0.7 : 0.45 * (coverage / 0.25))
             } else if l.contains(q) {
-                s = 0.55 + 0.25 * (Double(q.count) / Double(l.count))
+                let coverage = Double(q.count) / Double(l.count)
+                s = (0.55 + 0.25 * coverage) * min(1, coverage / 0.15)
             } else {
                 let lTokens = l.split(separator: " ").map(String.init)
                 let hits = qTokens.filter { qt in lTokens.contains { $0 == qt || $0.hasPrefix(qt) } }.count
